@@ -1,0 +1,363 @@
+/* =====================================================================
+   TOKENS (light/dark) — paleta, tipografia, espaçamentos e motion
+   ===================================================================== */
+:root {
+  color-scheme: light dark;
+
+   /* Paleta base */
+  --bg:              #f6f7f9;
+  --surface:         #ffffff;
+  --text:            #1a1f29;
+  --muted:           #5b6472;
+  --border:          #dde3ea;
+  --shadow:          0 6px 24px rgba(0,0,0,.06);
+
+  /* Ações / Estados */
+  --primary:          #2563eb;
+  --primary-hover:    #1d4ed8;
+  --primary-active:   #1e40af;
+  --primary-contrast: #ffffff;
+
+  --success:          #1e8e3e;
+  --danger:           #d93025;
+
+  /* Texto por estado (melhor contraste) */
+  --success-fg:       #106c3a;
+  --danger-fg:        #b42318;
+  --muted-stroke:     #cfd5df;      /* “stroke” da bolinha muted */
+
+  /* Botão neutro (default) */
+  --btn-neutral-bg:      #eef2f7;
+  --btn-neutral-fg:      var(--text);
+  --btn-neutral-border:  #cdd6e2;
+  --btn-neutral-hover:   #e3e8f1;
+  --btn-neutral-active:  #d8dfeb;
+
+  /* Inputs */
+  --input-bg:         #ffffff;
+  --input-fg:         var(--text);
+  --input-border:     var(--border);
+
+  /* Switch */
+  --switch-track:          #e3e8ef;
+  --switch-track-checked:  var(--primary);
+  --switch-thumb:          #ffffff;
+
+  /* KBD */
+  --kbd-bg:           #eef2f7;
+  --kbd-border:       #d6dde7;
+  --kbd-fg:           var(--text);
+
+  /* Seleção */
+  --selection-bg:     rgba(79,140,255,.30);
+  --selection-fg:     inherit;
+
+  /* Espaços/raios */
+  --radius: 10px;
+  --gap: 12px;
+  --gap-sm: 8px;
+  --gap-lg: 16px;
+
+  /* Componentes */
+  --status-height: 24px;
+
+  /* Acessibilidade */
+  --focus: 0 0 0 3px rgba(79,140,255,.30); 
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:              #111315;
+    --surface:         #181b1f;
+    --text:            #e8eaed;
+    --muted:           #a3aab5;
+    --border:          #2a2f36;
+    --shadow:          0 6px 24px rgba(0,0,0,.25);
+
+    --primary:          #2563eb;
+    --primary-hover:    #3571ee;
+    --primary-active:   #2a63d8;
+    --primary-contrast: #ffffff;
+
+    --btn-neutral-bg:        #242a31;
+    --btn-neutral-fg:        var(--text);
+    --btn-neutral-border:    #313741;
+    --btn-neutral-hover:     #2a3038;
+    --btn-neutral-active:    #323843;
+
+    --input-bg:         #23272e;
+    --input-fg:         var(--text);
+    --input-border:     var(--border);
+
+    --switch-track:          #3a3f46;
+    --switch-track-checked:  var(--primary);
+    --switch-thumb:          #ffffff;
+
+    --kbd-bg:           #1f2329;
+    --kbd-border:       var(--border);
+    --kbd-fg:           var(--text);
+
+    --selection-bg:     rgba(79,140,255,.35);
+    --selection-fg:     inherit;
+
+    --focus:            0 0 0 3px rgba(79,140,255,.35);
+
+    --success-fg:       #86efac;
+    --danger-fg:        #fda29b;
+    --muted-stroke:     #2f3844;
+  }
+}
+
+/* =====================================================================
+   BASE / RESET
+   ===================================================================== */
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+  margin: 0;
+}
+
+*::selection { background: var(--selection-bg); color: var(--selection-fg); }
+
+#root { min-width: 400px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@media (forced-colors: active) {
+  :root { --focus: 0 0 0 2px Highlight; }
+  .ui-button,
+  .ui-select,
+  .ui-switch input[type="checkbox"],
+  .ui-link { forced-color-adjust: auto; }
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+/* =====================================================================
+   LAYOUTS / TIPOS
+   ===================================================================== */
+
+.ui-surface {
+  background: var(--surface);
+  color: var(--text);
+  padding: 15px;
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+}
+
+.ui-surface--page {
+  max-width: 720px;
+  margin: auto;
+  box-shadow: none;
+}
+
+.ui-title {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+.ui-subtitle {
+  margin: 0 0 10px 0;
+  color: var(--muted);
+}
+
+/* =====================================================================
+   STATUS BAR (altura estável + fade)
+   ===================================================================== */
+.ui-statusbar{
+  min-height: var(--status-height);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.ui-statusbar[data-show="true"]{ opacity: 1; }
+
+.ui-statusbar::before{
+  content: '';
+  width: 14px; height: 14px;
+  flex: 0 0 14px;
+  border-radius: 50%;
+  opacity: .9;
+}
+
+.ui-statusbar--muted   { color: var(--muted); }
+.ui-statusbar--success { color: var(--success-fg); }
+.ui-statusbar--danger  { color: var(--danger-fg); }
+
+.ui-statusbar--muted::before   { background: var(--stroke); }
+.ui-statusbar--success::before { background: var(--success); }
+.ui-statusbar--danger::before  { background: var(--danger); }
+
+/* =====================================================================
+   FORM / CONTROLES
+   ===================================================================== */
+.ui-fieldset {
+  display: grid;
+  gap: var(--gap);
+  border: none;
+  padding: 0;
+  margin: 0 0 var(--gap-lg) 0;
+}
+
+/* Switch */
+.ui-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ui-switch input[type="checkbox"] {
+  appearance: none;
+  width: 36px; height: 22px;
+  border-radius: 999px;
+  background: var(--switch-track);
+  border: 1px solid var(--input-border);
+  position: relative;
+  transition: background .15s ease;
+  outline: none;
+}
+.ui-switch input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--switch-thumb);
+  transition: transform .15s ease;
+}
+.ui-switch input[type="checkbox"]:checked { background: var(--switch-track-checked); }
+.ui-switch input[type="checkbox"]:checked::after { transform: translateX(14px); }
+.ui-switch input[type="checkbox"]:focus-visible { box-shadow: var(--focus); }
+
+.ui-switch__label { user-select: none; }
+
+/* Select */
+.ui-label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+.ui-select {
+  appearance: none;
+  background: var(--input-bg);
+  color: var(--input-fg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.ui-select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+/* Field help */
+.ui-help {
+  color: var(--muted);
+  font-size: 11px;
+  margin: -6px 0 2px 46px; /* alinha com as switches */
+}
+
+/* =====================================================================
+   BOTÕES / LINKS
+   ===================================================================== */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: .5rem .9rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+
+  border: 1px solid var(--btn-neutral-border);
+  background: var(--btn-neutral-bg);
+  color: var(--btn-neutral-fg);
+
+  transition: background .15s ease, box-shadow .15s ease, transform .02s ease;
+}
+.ui-button:hover { background: var(--btn-neutral-hover); }
+.ui-button:active { background: var(--btn-neutral-active); transform: translateY(1px); }
+.ui-button:focus-visible { outline: none; box-shadow: var(--focus); }
+.ui-button[disabled] { opacity: .6; pointer-events: none; }
+
+/* Animação “busy” bem leve */
+.ui-button.is-busy { position: relative; }
+.ui-button.is-busy::after {
+  content: '…';
+  animation: dots 1s infinite steps(3, end);
+}
+@keyframes dots { 0% { content: '…'; } 33% { content: '..'; } 66% { content: '.'; } }
+
+/* Primário */
+.ui-button--primary {
+  background: var(--primary);
+  color: var(--primary-contrast);
+  border-color: transparent;
+}
+.ui-button--primary:hover { background: var(--primary-hover); }
+.ui-button--primary:active { background: var(--primary-active); }
+
+/* Block */
+.ui-button--block { width: 100%; }
+
+/* Link */
+.ui-link {
+  background: none;
+  border: 0;
+  color: var(--text);
+  text-decoration: underline;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ui-link:focus-visible { outline: none; box-shadow: var(--focus); }
+
+/* Linha com kbd + ação */
+.ui-row {
+  margin-top: var(--gap);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+/* =====================================================================
+   TIPOS MENORES
+   ===================================================================== */
+.ui-kbdline { color: var(--muted); font-size: 11px; }
+
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--kbd-bg);
+  color: var(--kbd-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.ui-details { margin: 12px 0 16px 0; }
+.ui-details > summary { cursor: pointer; font-weight: 700; }
+.ui-details__content { margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+.ui-meta { color: var(--muted); font-size: 11px; }
