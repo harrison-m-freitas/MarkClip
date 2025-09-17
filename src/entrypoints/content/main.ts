@@ -9,7 +9,7 @@ const DEFAULTS: ExportOptions = {
 };
 
 async function getOptions(): Promise<ExportOptions> {
-  const r = await chrome.storage.sync.get(['embedImages', 'includeMetadata', 'parser']);
+  const r = await browser.storage.sync.get(['embedImages', 'includeMetadata', 'parser']);
   return {
     embedImages: r.embedImages ?? DEFAULTS.embedImages,
     includeMetadata: r.includeMetadata ?? DEFAULTS.includeMetadata,
@@ -17,10 +17,30 @@ async function getOptions(): Promise<ExportOptions> {
   };
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+browser.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'EXPORT_MARKDOWN') {
-    exportCurrentPage().then(sendResponse);
-    return true;
+    return exportCurrentPage();
+  }
+  if (msg?.type === 'FORCE_DOWNLOAD_FALLBACK') {
+    const { filename, markdown } = msg as { filename: string; markdown: string };
+    try {
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || 'export.md';
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.documentElement.appendChild(a);
+      a.click();
+      a.remove();
+      // dá um tempo pequeno para o navegador capturar o blob
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      return Promise.resolve({ ok: true });
+    } catch (e) {
+      console.error('[CS] Fallback de download falhou', e);
+      return Promise.resolve({ ok: false, error: String(e) });
+    }
   }
 });
 

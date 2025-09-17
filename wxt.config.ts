@@ -13,6 +13,13 @@ export default defineConfig({
       'Exporta a página atual para Markdown (.md) com suporte a imagens, blocos de código e parsers por domínio.',
     version: '1.0.0',
 
+    browser_specific_settings: {
+      gecko: {
+        id: 'markclip@example.local',
+        strict_min_version: '115.0'
+      }
+    },
+
     action: {
       default_popup: 'popup.html',
       default_title: 'Exportar para Markdown',

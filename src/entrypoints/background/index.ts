@@ -2,45 +2,55 @@ import type { UiToBgMessage } from '~/types';
 import { COMMANDS, CONTEXT_MENU_IDS } from '~/constants';
 
 export default defineBackground(() => {
-  chrome.runtime.onInstalled.addListener(async () => {
-    try {
-      await chrome.contextMenus.removeAll();
-    } catch {}
-    chrome.contextMenus.create({
+  browser.runtime.onInstalled.addListener(() => {
+    void browser.contextMenus.removeAll().catch(() => {});
+    browser.contextMenus.create({
+      id: CONTEXT_MENU_IDS.EXPORT_MD,
+      title: 'Exportar como Markdown',
+      contexts: ['page', 'selection'],
+    })
+  });
+
+  browser.runtime.onStartup?.addListener(() => {
+    void browser.contextMenus.removeAll().catch(() => {});
+    browser.contextMenus.create({
       id: CONTEXT_MENU_IDS.EXPORT_MD,
       title: 'Exportar como Markdown',
       contexts: ['page', 'selection'],
     });
   });
 
-  chrome.runtime.onStartup?.addListener(async () => {
-    try {
-      await chrome.contextMenus.removeAll();
-    } catch {}
-    chrome.contextMenus.create({
-      id: CONTEXT_MENU_IDS.EXPORT_MD,
-      title: 'Exportar como Markdown',
-      contexts: ['page', 'selection'],
-    });
-  });
-
-  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === CONTEXT_MENU_IDS.EXPORT_MD && tab?.id) {
       // (Opcional) Se quiser exportar só a seleção:
       // await requestExport(tab.id, typeof info.selectionText === 'string' ? info.selectionText : undefined);
-      await requestExport(tab.id);
+      void requestExport(tab.id);
     }
   });
 
-  chrome.commands.onCommand.addListener(async (command) => {
+  browser.commands.onCommand.addListener((command) => {
     if (command === COMMANDS.EXPORT_MARKDOWN) {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id) await requestExport(tab.id);
+      void (async () => {
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) await requestExport(tab.id);
+      })
+    }
+  });
+
+  const blobUrls = new Map<number, string>();
+
+  browser.downloads.onChanged.addListener((delta) => {
+    if (!delta || typeof delta.id !== 'number') return;
+    const url = blobUrls.get(delta.id);
+    if (!url) return;
+    if (delta.state?.current === 'complete' || delta.state?.current === 'interrupted') {
+      try { URL.revokeObjectURL(url); } catch {}
+      blobUrls.delete(delta.id);
     }
   });
 
   async function requestExport(tabId: number, /*, selection?: string */) {
-    let res = await chrome.tabs
+    let res = await browser.tabs
       .sendMessage(tabId, { type: 'EXPORT_MARKDOWN' /*, selection*/ } as unknown as UiToBgMessage)
       .catch((err) => {
         console.warn('[BG] sendMessage falhou (provavelmente CS não injetado ainda)', err);
@@ -49,7 +59,7 @@ export default defineBackground(() => {
 
     if (!res || !('ok' in res) || !res.ok) {
       try {
-        await chrome.scripting.executeScript({
+        await browser.scripting.executeScript({
           target: { tabId },
           files: ['content-scripts/content.js'],
           // world: 'ISOLATED', // default em MV3; ajuste se precisar tocar no DOM da página
@@ -62,7 +72,7 @@ export default defineBackground(() => {
         return;
       }
 
-      res = await chrome.tabs
+      res = await browser.tabs
         .sendMessage(tabId, { type: 'EXPORT_MARKDOWN' /*, selection*/ } as unknown as UiToBgMessage)
         .catch((err) => {
           console.warn('[BG] sendMessage falhou mesmo após injetar CS', err);
@@ -74,33 +84,45 @@ export default defineBackground(() => {
         return;
       }
     }
-    await downloadMarkdown(res.filename as string, res.markdown as string);
+    await downloadMarkdown(res.filename as string, res.markdown as string, tabId);
   }
 
-  async function downloadMarkdown(filename: string, markdown: string) {
-    const dataUrl =
-      'data:text/markdown;charset=utf-8,' + encodeURIComponent(markdown);
-
+  async function downloadMarkdown(filename: string, markdown: string, tabId: number) {
     try {
-      await chrome.downloads.download({
-        url: dataUrl,
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const id = await browser.downloads.download({
+        url,
         filename,
         saveAs: true,
-        conflictAction: 'uniquify',
+        conflictAction: 'uniquify'
+      });
+
+      blobUrls.set(id, url);
+      return;
+    } catch (err) {
+      console.warn('[BG] Blob download falhou; tentando fallback pelo content script…', err);
+    }
+
+    try {
+      await browser.tabs.sendMessage(tabId, {
+        type: 'FORCE_DOWNLOAD_FALLBACK',
+        filename,
+        markdown
       });
     } catch (err) {
-      console.error('[BG] Falha ao iniciar download do Markdown', err);
+       console.error('[BG] Fallback de download também falhou', err);
     }
   }
 
   // Mensagens diretas do popup para exportar
-  chrome.runtime.onMessage.addListener((msg: UiToBgMessage, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((msg: UiToBgMessage) => {
     if (msg?.type === 'EXPORT_NOW') {
-      chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+      return (async () => {
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         if (tab?.id) await requestExport(tab.id);
-      });
-      sendResponse({ ok: true });
-      return true;
+        return { ok: true as const };
+      })();
     }
   });
 
