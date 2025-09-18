@@ -28,7 +28,7 @@ export default function Options() {
     let mounted = true;
     (async () => {
       try {
-        const r = await chrome.storage.sync.get(['embedImages', 'includeMetadata', 'parser']);
+        const r = await browser.storage.sync.get(['embedImages', 'includeMetadata', 'parser']);
         if (!mounted) return;
         setOpts({
           embedImages: r.embedImages ?? DEFAULTS.embedImages,
@@ -49,7 +49,7 @@ export default function Options() {
   }, []);
 
   useEffect(() => {
-    const handler: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (changes, area) => {
+    const handler: Parameters<typeof browser.storage.onChanged.addListener>[0] = (changes, area) => {
       if (area !== 'sync') return;
       const next = { ...opts };
       let changed = false;
@@ -68,8 +68,8 @@ export default function Options() {
       }
       if (changed) setOpts(next);
     };
-    chrome.storage.onChanged.addListener(handler);
-    return () => chrome.storage.onChanged.removeListener(handler);
+    browser.storage.onChanged.addListener(handler);
+    return () => browser.storage.onChanged.removeListener(handler);
   }, [opts]);
 
   function scheduleSave(next: ExportOptions) {
@@ -77,7 +77,7 @@ export default function Options() {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(async () => {
       try {
-        await chrome.storage.sync.set(next);
+        await browser.storage.sync.set(next);
         setJustSaved(true);
         window.setTimeout(() => setJustSaved(false), 1100);
       } catch {
@@ -98,7 +98,7 @@ export default function Options() {
   async function resetToDefaults() {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     try {
-      await chrome.storage.sync.set(DEFAULTS);
+      await browser.storage.sync.set(DEFAULTS);
       setOpts(DEFAULTS);
       setJustSaved(true);
       window.setTimeout(() => setJustSaved(false), 1100);
@@ -167,7 +167,7 @@ export default function Options() {
         <summary>Avançado</summary>
         <div className="ui-details__content">
           <p className="ui-help">
-            Preferências sincronizadas via <code>chrome.storage.sync</code>. Alterações em outra janela
+            Preferências sincronizadas via <code>browser.storage.sync</code>. Alterações em outra janela
             refletem aqui automaticamente.
           </p>
         </div>

@@ -30,7 +30,7 @@ export default function App() {
     let mounted = true;
     (async () => {
       try {
-        const r = await chrome.storage.sync.get(['embedImages', 'includeMetadata', 'parser']);
+        const r = await browser.storage.sync.get(['embedImages', 'includeMetadata', 'parser']);
         if (!mounted) return;
         setOpts({
           embedImages: r.embedImages ?? DEFAULTS.embedImages,
@@ -51,7 +51,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handler: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (changes, area) => {
+    const handler: Parameters<typeof browser.storage.onChanged.addListener>[0] = (changes, area) => {
       if (area !== 'sync') return;
       const next = { ...opts };
       let changed = false;
@@ -70,8 +70,8 @@ export default function App() {
       }
       if (changed) setOpts(next);
     };
-    chrome.storage.onChanged.addListener(handler);
-    return () => chrome.storage.onChanged.removeListener(handler);
+    browser.storage.onChanged.addListener(handler);
+    return () => browser.storage.onChanged.removeListener(handler);
   }, [opts]);
 
   function scheduleSave(next: ExportOptions) {
@@ -79,7 +79,7 @@ export default function App() {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(async () => {
       try {
-        await chrome.storage.sync.set(next);
+        await browser.storage.sync.set(next);
         setJustSaved(true);
         window.setTimeout(() => setJustSaved(false), 900);
       } catch {
@@ -97,7 +97,7 @@ export default function App() {
     setErrorMsg(null);
     try {
       setExporting(true);
-      const ack = await chrome.runtime.sendMessage({ type: 'EXPORT_NOW' });
+      const ack = await browser.runtime.sendMessage({ type: 'EXPORT_NOW' });
       // o download em si é disparado no BG; aqui só sinalizamos “ok”
       if (ack?.ok) {
         setExportOk(true);
@@ -194,7 +194,7 @@ export default function App() {
         <p className="ui-kbdline">
           Atalho: <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd>
         </p>
-        <button className="ui-link" onClick={() => chrome.runtime.openOptionsPage()} disabled={exporting}>
+        <button className="ui-link" onClick={() => browser.runtime.openOptionsPage()} disabled={exporting}>
           Abrir opções
         </button>
       </div>
