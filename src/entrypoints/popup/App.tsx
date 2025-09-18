@@ -12,6 +12,8 @@ const PARSER_OPTIONS: Array<{ value: ExportOptions['parser']; label: string }> =
   { value: 'generic',       label: 'Genérico' },
   { value: 'medium',        label: 'Medium' },
   { value: 'github-readme', label: 'GitHub README' },
+  { value: 'tryhackme',     label: 'Try Hack Me'},
+  
 ];
 
 const SAVE_DEBOUNCE_MS = 250;
