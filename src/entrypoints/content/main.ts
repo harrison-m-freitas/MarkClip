@@ -1,6 +1,7 @@
 // src/content/main.ts (apenas as linhas impactadas)
 import { ParserRegistry } from './parsers';
-import type { ExportOptions, ISODate } from '~/types'; 
+import type { ExportOptions, ISODate } from '~/types';
+import { dtimer, dgroup, dlog } from '~/lib/debug';
 
 const DEFAULTS: ExportOptions = {
   embedImages: false,
@@ -45,13 +46,23 @@ browser.runtime.onMessage.addListener((msg) => {
 });
 
 async function exportCurrentPage() {
+  const tAll = dtimer('export', 'exportCurrentPage');
+  
   const opts = await getOptions();
+  dgroup('export', 'opções resolvidas', () => console.debug(opts));
 
   const registry = new ParserRegistry();
   const resolution = registry.resolve(location.href, document, opts.parser);
   const parser = resolution.selected;
 
+  dgroup('export', `parser selecionado: ${parser.name}`, () => {
+    console.debug(resolution);
+  });
+
+  const tExtract = dtimer('export', 'extract()');
   const { contentHtml, title } = await parser.extract(document);
+  tExtract.end();
+  dlog('export', `extract html bytes: ${String(contentHtml).length}`);
 
   const dateIso = new Date().toISOString().slice(0, 10) as ISODate;
   const fm = opts.includeMetadata
@@ -62,14 +73,14 @@ async function exportCurrentPage() {
       }
     : undefined;
 
-  const { markdown } = await parser.toMarkdown(contentHtml, {
-    embedImages: opts.embedImages,
-    frontmatter: fm,
-  });
+  const tMd = dtimer('export', 'toMarkdown()');
+  const { markdown } = await parser.toMarkdown(contentHtml, { embedImages: opts.embedImages, frontmatter: fm });
+  tMd.end();
+  dlog('export', `markdown bytes: ${markdown.length}`);
 
-  const safeTitle =
-    (title || document.title || 'export').replace(/[\\/:*?"<>|]/g, '_').trim() || 'export';
+  const safeTitle = (title || document.title || 'export').replace(/[\\/:*?"<>|]/g, '_').trim() || 'export';
   const filename = `${safeTitle}.md`;
 
+  tAll.end();
   return { ok: true, markdown, filename };
 }

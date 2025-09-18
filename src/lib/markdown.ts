@@ -26,6 +26,7 @@ import type {
 
 import { embedImageAsDataURLIfNeeded } from './images';
 import { isAbsoluteUrl, normalizeSrcset } from './dom';
+import { dlog, dgroup, dtimer, flag, revealSpaces, sampleLines } from './debug';
 
 const stringifyOptions: RemarkStringifyOptions & { 'entities': string } = {
   fences: true,
@@ -76,29 +77,46 @@ export async function htmlToMarkdown(
 ): Promise<ToMarkdownResult> {
   const { embedImages, frontmatter, baseUrl } = options;
 
+  const tAll = dtimer('export', 'pipeline total (html→md)');
+  dgroup('export', 'htmlToMarkdown: opções', () => {
+    console.debug({ embedImages, hasFrontmatter: !!frontmatter, baseUrl });
+  });
+
   // Passo (opcional): embutir imagens **antes** de parsear (mantém src em data:)
+  const tPre = dtimer('export', 'pré-processamento de imagens');
   const htmlPreProcessed = embedImages ? await transformImagesToDataUrls(html, baseUrl) : html;
+  tPre.end();
+
+  dlog('export', `html length (orig): ${String(html).length}, (pre): ${String(htmlPreProcessed).length}`);
 
   // Monta a pipeline unified
+  const tUnified = dtimer('export', 'unified.process');
   const file = await unified()
     .use(rehypeParse, { fragment: true })
     .use(makeRehypeAbsUrlsPlugin(baseUrl))          // absolutiza href/src/srcset (rehype AST)
     .use(rehypeRemark)
     .use(remarkGfm)
     .use(makeRemarkFixCodeLangs())                  // garante .lang quando houver classes
+    .use(makeRemarkNormalizeCodeBlocks())
     .use(remarkStringify, stringifyOptions)
     .process(htmlPreProcessed);
+  tUnified.end();
 
   let markdown = String(file) as MarkdownString;
 
   // Prefixa frontmatter, se houver
   if (frontmatter) {
+    dgroup('export', 'frontmatter (yaml)', () => {
+      console.debug(buildFrontmatter(frontmatter));
+    });
     markdown = (buildFrontmatter(frontmatter) + markdown) as MarkdownString;
   }
 
   // Garante \n final
   if (!markdown.endsWith('\n')) markdown = (markdown + '\n') as MarkdownString;
 
+  dlog('export', `markdown bytes: ${markdown.length}`);
+  tAll.end();
   return { markdown };
 }
 
@@ -159,22 +177,97 @@ function makeRehypeAbsUrlsPlugin(baseUrl?: string) {
 
 /** Plugin remark: define node.lang quando detectável via classe do HTML original */
 function makeRemarkFixCodeLangs() {
+  const LANG_ALIASES: Record<string, string> = {
+    'shell-session': 'bash',
+    'sh-session': 'bash',
+    'terminal': 'bash',
+  };
+  
   // Observação: após rehype→remark, informações de classe podem descer para node.meta
   return function remarkFixCodeLangs() {
     return (tree: any) => {
       visit(tree, 'code', (node: any) => {
-        if (node.lang) return;
-        // Tenta extrair de meta: ex. "class=language-ts" ou "lang=ts"
-        if (typeof node.meta === 'string' && node.meta.length > 0) {
+        if (!node.lang && typeof node.meta === 'string' && node.meta.length > 0) {
           const m =
             node.meta.match(/language-([A-Za-z0-9+#-]+)/) ||
             node.meta.match(/lang=([A-Za-z0-9+#-]+)/);
-          if (m?.[1]) node.lang = m[1].toLowerCase();
+          if (m?.[1]) {
+            node.lang = m[1].toLowerCase();
+            dlog('codes', `lang detectado via meta: ${node.lang}`);
+          }
+        }
+
+        if (node.lang && LANG_ALIASES[node.lang]) {
+          const k = String(node.lang).toLowerCase();
+          if (LANG_ALIASES[k]) node.lang = LANG_ALIASES[k];
         }
       });
     };
   };
 }
+
+/** Plugin remark: trim + dedent em todos os blocos de código */
+function makeRemarkNormalizeCodeBlocks() {
+  return function remarkNormalizeCode() {
+    return (tree: any) => {
+      visit(tree, 'code', (node: any) => {
+        if (!node || typeof node.value !== 'string') return;
+
+        // NBSP opcional (ligue com: localStorage.setItem('md.fix.nbsp', '1'))
+        let text = node.value.replace(/\r\n?/g, '\n').replace(/\t/g, '    ');
+        text = text.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+        text = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
+        text = text.replace("           ", '');
+
+        let lines: string[] = text.split('\n');
+
+        const beforeInfo = {
+          lang: node.lang || '(sem lang)',
+          nLines: lines.length,
+          sample: sampleLines(revealSpaces(text)),
+        };
+
+        // trim bordas
+        while (lines.length && lines[0].trim() === '') lines.shift();
+        while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+        if (lines.length === 0) {
+          dgroup('codes', 'code block vazio após trim', () => console.debug(beforeInfo));
+          node.value = '';
+          return;
+        }
+
+        // indent mínimo comum
+        let minIndent = 0;
+        for (const l of lines) {
+          if (l.trim() === '') continue;
+          const m = l.match(/^(\s*)/);
+          const ind = m ? m[1].length : 0;
+          if (minIndent === 0 || ind < minIndent) minIndent = ind;
+        }
+
+        if (minIndent > 0) {
+          lines = lines.map((line: string) =>
+            line.length >= minIndent ? line.slice(minIndent) : line.trimStart()
+          );
+        }
+
+        const after = lines.join('\n');
+
+        dgroup('codes', `normalize code (${node.lang || 'no-lang'})`, () => {
+          console.debug({
+            minIndent,
+            removedLeading: beforeInfo.nLines - lines.length < 0 ? 0 : undefined,
+            before: beforeInfo.sample,
+            after: sampleLines(revealSpaces(after)),
+          });
+        });
+
+        node.value = after;
+      });
+    };
+  };
+}
+
 
 /** Pré-processa HTML, convertendo <img src> → data:URL quando embedImages=true */
 async function transformImagesToDataUrls(html: HtmlString | string, baseUrl?: string): Promise<string> {
@@ -194,7 +287,12 @@ async function transformImagesToDataUrls(html: HtmlString | string, baseUrl?: st
           timeoutMs: 9000,
           maxBytes: 6 * 1024 * 1024, // 6MiB
         });
-        if (dataUrl) img.setAttribute('src', dataUrl);
+        if (dataUrl) {
+          dlog('images', `embedded: ${abs} → data:${dataUrl.slice(5, 20)}…`);
+          img.setAttribute('src', dataUrl);
+        } else {
+          dlog('images', `kept url: ${abs} (sem embed)`);
+        }
       } catch {
         // mantém URL original se falhar
       }

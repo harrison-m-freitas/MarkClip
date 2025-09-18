@@ -2,6 +2,7 @@ import type { IParser, ParserName, IParserRegistry, ParserResolution } from '~/t
 import { GenericParser } from './generic/generic-parser';
 import { MediumParser } from './specific/medium-parser';
 import { GithubReadmeParser } from './specific/github-parser';
+import { THMParser } from './specific/thm-parser';
 
 type Score = number;
 
@@ -12,6 +13,7 @@ export class ParserRegistry implements IParserRegistry {
   constructor() {
     this.register(new MediumParser());
     this.register(new GithubReadmeParser());
+    this.register(new THMParser());
   }
 
   register(parser: IParser): void {
